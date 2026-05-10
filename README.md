@@ -1,22 +1,60 @@
-# AI StableCoin — Hardhat Project (Phases 1 & 2)
+# AI StableCoin — Hardhat Project (Phases 1, 2 & 3)
 
 ## Project Structure
 
 ```
 ai-stablecoin/
 ├── contracts/
-│   ├── AIStablecoin.sol       ← Phase 1: ERC-20 token
-│   └── OracleReceiver.sol     ← Phase 2: Price oracle
+│   ├── AIStablecoin.sol         ← Phase 1: ERC-20 stablecoin (mint/burn/rebase)
+│   ├── OracleReceiver.sol       ← Phase 2: Multi-source price oracle
+│   ├── PriceController.sol      ← Phase 3: Stabilization engine
+│   └── mocks/
+│       ├── MockOracle.sol       ← Test double for OracleReceiver
+│       └── MockToken.sol        ← Test double for AIStablecoin
 ├── test/
-│   ├── AIStablecoin.test.js   ← 30+ test cases for token
-│   └── OracleReceiver.test.js ← 30+ test cases for oracle
+│   ├── AIStablecoin.test.js     ← 30+ test cases
+│   ├── OracleReceiver.test.js   ← 30+ test cases
+│   └── PriceController.test.js  ← 30+ test cases
 ├── scripts/
-│   └── deploy.js              ← Deployment script
+│   └── deploy.js                ← Deploys all 3 contracts and wires roles
 ├── hardhat.config.js
 ├── package.json
 ├── .env.example
 └── .gitignore
 ```
+
+---
+
+## Architecture Overview
+
+```
+  Off-chain oracle nodes
+         │
+         │ submitPrice()
+         ▼
+  ┌─────────────────┐       latestValidatedPrice()      ┌──────────────────────┐
+  │ OracleReceiver  │ ─────────────────────────────────▶ │  PriceController     │
+  │   (Phase 2)     │       deviationFromPeg()           │    (Phase 3)         │
+  └─────────────────┘                                    └──────────┬───────────┘
+                                                                    │
+                                              mint() / burn() / rebase()
+                                                                    │
+                                                                    ▼
+                                                         ┌─────────────────────┐
+                                                         │   AIStablecoin      │
+                                                         │     (Phase 1)       │
+                                                         └─────────────────────┘
+```
+
+### How stabilization works
+
+| Oracle Price | Deviation | Action taken by PriceController |
+|---|---|---|
+| = $5.00 | < 100 bps | **Skip** — within dead-band |
+| > $5.00 | 100–499 bps | **Mint** tokens to treasury (expands supply) |
+| < $5.00 | -100 to -499 bps | **Burn** tokens from treasury (contracts supply) |
+| > $5.00 | ≥ 500 bps | **Positive rebase** (proportional expansion, capped 5%) |
+| < $5.00 | ≤ -500 bps | **Negative rebase** (proportional contraction, capped 5%) |
 
 ---
 
@@ -32,14 +70,10 @@ node --version   # should be v18 or higher
 
 ## Step 2 — Install Dependencies
 
-Navigate into the project folder and install:
-
 ```bash
 cd ai-stablecoin
 npm install
 ```
-
-This installs Hardhat and all testing tools (`chai`, `ethers`, network helpers).
 
 ---
 
@@ -49,13 +83,13 @@ This installs Hardhat and all testing tools (`chai`, `ethers`, network helpers).
 npx hardhat compile
 ```
 
-You will see:
+Expected output:
 
 ```
-Compiled 2 Solidity files successfully
+Compiled 5 Solidity files successfully
 ```
 
-Compiled artifacts go into `/artifacts/`. You don't need to touch them manually.
+Artifacts go into `/artifacts/`. You don't need to touch them manually.
 
 ---
 
@@ -65,20 +99,21 @@ Compiled artifacts go into `/artifacts/`. You don't need to touch them manually.
 npx hardhat test
 ```
 
-To run only one contract's tests:
+To run a single contract's tests:
 
 ```bash
 npx hardhat test test/AIStablecoin.test.js
 npx hardhat test test/OracleReceiver.test.js
+npx hardhat test test/PriceController.test.js
 ```
 
-To see gas usage per function:
+To print gas usage per function:
 
 ```bash
 REPORT_GAS=true npx hardhat test
 ```
 
-To see test coverage:
+To generate a coverage report:
 
 ```bash
 npx hardhat coverage
@@ -88,15 +123,11 @@ npx hardhat coverage
 
 ## Step 5 — Run a Local Hardhat Node (Optional)
 
-If you want a live local blockchain to interact with manually:
-
 ```bash
+# Terminal 1 — start local blockchain
 npx hardhat node
-```
 
-Leave this terminal open. Open a second terminal and deploy to it:
-
-```bash
+# Terminal 2 — deploy to it
 npx hardhat run scripts/deploy.js --network localhost
 ```
 
@@ -106,10 +137,7 @@ npx hardhat run scripts/deploy.js --network localhost
 
 ### 6a. Get testnet ETH
 
-Visit the faucet from your project plan:
 [https://www.alchemy.com/faucets/base-sepolia](https://www.alchemy.com/faucets/base-sepolia)
-
-Paste your wallet address and receive free testnet ETH.
 
 ### 6b. Set up your .env file
 
@@ -117,7 +145,7 @@ Paste your wallet address and receive free testnet ETH.
 cp .env.example .env
 ```
 
-Open `.env` and fill in:
+Fill in:
 
 ```
 PRIVATE_KEY=your_wallet_private_key_without_0x
@@ -125,96 +153,119 @@ BASE_SEPOLIA_RPC_URL=https://base-sepolia.g.alchemy.com/v2/YOUR_KEY
 BASESCAN_API_KEY=your_basescan_api_key
 ```
 
-> ⚠️ Never commit `.env` to git. It's already in `.gitignore`.
+> ⚠️ Never commit `.env` to git. It is already in `.gitignore`.
 
 ### 6c. Get an Alchemy RPC URL
 
-1. Go to [https://www.alchemy.com](https://www.alchemy.com) and create a free account
+1. Create a free account at [https://www.alchemy.com](https://www.alchemy.com)
 2. Create a new app → choose **Base Sepolia**
-3. Copy the HTTPS URL into your `.env`
+3. Copy the HTTPS URL into `.env`
 
-### 6d. Deploy
+### 6d. Deploy all three contracts
 
 ```bash
 npx hardhat run scripts/deploy.js --network baseSepolia
 ```
 
-You will see the deployed addresses printed in the terminal. Save them.
+The script deploys all three contracts in order, wires the roles automatically, and prints all addresses. Save them.
+
+**Before deploying to production**, edit `deploy.js` and replace:
+- The oracle node placeholder addresses with real oracle wallets
+- The treasury address (currently deployer) with a multisig
 
 ---
 
-## Step 7 — Verify Contracts on Basescan (Optional but Recommended)
-
-After deployment, verify so you can interact via the Basescan UI:
+## Step 7 — Verify Contracts on Basescan
 
 ```bash
-# AIStablecoin — args: admin_address  initial_supply_in_wei
+# AIStablecoin
 npx hardhat verify --network baseSepolia \
   <AIStablecoin_address> \
   "0xYourAdminAddress" \
   "1000000000000000000000000"
 
-# OracleReceiver — args: admin  [oracle1,oracle2,oracle3]  quorum
+# OracleReceiver
 npx hardhat verify --network baseSepolia \
   <OracleReceiver_address> \
   "0xYourAdminAddress" \
   '["0xOracle1","0xOracle2","0xOracle3"]' \
   "2"
+
+# PriceController
+npx hardhat verify --network baseSepolia \
+  <PriceController_address> \
+  "0xYourAdminAddress" \
+  "<OracleReceiver_address>" \
+  "<AIStablecoin_address>" \
+  "0xYourTreasuryAddress"
 ```
 
-Then open [https://sepolia.basescan.org](https://sepolia.basescan.org), search your address,
-and use the **Read/Write Contract** tab.
+Then open [https://sepolia.basescan.org](https://sepolia.basescan.org) and use the **Read/Write Contract** tab to interact.
 
 ---
 
 ## Roles Quick Reference
 
-### AIStablecoin roles
+### AIStablecoin
 
-| Role         | Who holds it (planned)   | What it allows           |
-|--------------|--------------------------|--------------------------|
-| ADMIN_ROLE   | Your deployer / multisig | Pause, manage roles      |
-| MINTER_ROLE  | PriceController (Phase 3)| Call `mint()`            |
-| BURNER_ROLE  | PriceController (Phase 3)| Call `burn()`            |
-| REBASE_ROLE  | PriceController (Phase 3)| Call `rebase()`          |
+| Role | Held by | Allows |
+|---|---|---|
+| ADMIN_ROLE | Deployer / multisig | Pause, manage roles |
+| MINTER_ROLE | PriceController | Call `mint()` |
+| BURNER_ROLE | PriceController | Call `burn()` |
+| REBASE_ROLE | PriceController | Call `rebase()` |
 
-Grant a role after deployment:
+### OracleReceiver
+
+| Role | Held by | Allows |
+|---|---|---|
+| ADMIN_ROLE | Deployer / multisig | Manage nodes, config |
+| ORACLE_ROLE | Off-chain oracle wallets | Call `submitPrice()` |
+| CONSUMER_ROLE | PriceController, AIController | Read price data |
+
+### PriceController
+
+| Role | Held by | Allows |
+|---|---|---|
+| ADMIN_ROLE | Deployer / multisig | Config, pause, role management |
+| KEEPER_ROLE | Bot / deployer / AIController | Call `stabilize()` |
+
+Grant a role manually via the Hardhat console:
 
 ```javascript
-// In Hardhat console: npx hardhat console --network baseSepolia
-const token = await ethers.getContractAt("AIStablecoin", "<address>");
-const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
-await token.grantRole(MINTER_ROLE, "<PriceController_address>");
+// npx hardhat console --network baseSepolia
+const controller = await ethers.getContractAt("PriceController", "<address>");
+const KEEPER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("KEEPER_ROLE"));
+await controller.grantRole(KEEPER_ROLE, "<keeper_bot_address>");
 ```
-
-### OracleReceiver roles
-
-| Role          | Who holds it (planned)    | What it allows           |
-|---------------|---------------------------|--------------------------|
-| ADMIN_ROLE    | Your deployer / multisig  | Manage oracles, config   |
-| ORACLE_ROLE   | Off-chain oracle nodes    | Call `submitPrice()`     |
-| CONSUMER_ROLE | PriceController, AIController | Read price data      |
 
 ---
 
-## Wiring to Phase 3 (PriceController)
+## PriceController Key Functions
 
-When you build `PriceController.sol`, it will:
+| Function | Who calls it | Description |
+|---|---|---|
+| `stabilize()` | Keeper bot (hourly) | Reads oracle, decides action, executes |
+| `previewStabilization()` | Anyone (view) | Preview action without executing — use in keeper bots |
+| `status()` | Anyone (view) | Live snapshot: price, deviation, supply, cycle count |
+| `recentLog(n)` | Anyone (view) | Last N stabilization records, newest first |
+| `cooldownRemaining()` | Anyone (view) | Seconds until next `stabilize()` is allowed |
 
-1. Call `OracleReceiver.latestValidatedPrice()` to get the current price
-2. Compare against the $5.00 peg (`OracleReceiver.PEG_PRICE()`)
-3. Call `AIStablecoin.mint()` if price > peg, or `AIStablecoin.burn()` if price < peg
+---
 
-You will then:
+## Phase 4 — AIController (coming next)
+
+When AIController is deployed it will:
+
+1. Read `OracleReceiver.priceHistory()` for trend data
+2. Use confidence scoring to approve or block stabilization actions
+3. Call `PriceController.stabilize()` via KEEPER_ROLE
+
+Wiring needed after AIController deployment:
 
 ```bash
-# Grant PriceController the roles it needs on AIStablecoin
-grantRole(MINTER_ROLE, priceControllerAddress)
-grantRole(BURNER_ROLE, priceControllerAddress)
-grantRole(REBASE_ROLE, priceControllerAddress)
-
-# Grant PriceController read access on OracleReceiver
-grantRole(CONSUMER_ROLE, priceControllerAddress)
+controller.grantRole(KEEPER_ROLE, aiControllerAddress)
+oracle.grantRole(CONSUMER_ROLE, aiControllerAddress)
 ```
 
 ---
@@ -222,10 +273,10 @@ grantRole(CONSUMER_ROLE, priceControllerAddress)
 ## Common Commands
 
 ```bash
-npm test                          # run all tests
-npx hardhat test test/X.test.js   # run one file
-npx hardhat coverage              # coverage report
-npx hardhat compile               # recompile after edits
-npx hardhat node                  # local blockchain
-npx hardhat console --network baseSepolia  # interactive console
+npm test                                        # run all tests
+npx hardhat test test/PriceController.test.js  # run one file
+npx hardhat coverage                            # coverage report
+npx hardhat compile                             # recompile after edits
+npx hardhat node                                # local blockchain
+npx hardhat console --network baseSepolia       # interactive console
 ```

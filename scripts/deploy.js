@@ -7,64 +7,57 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("\n=== AI StableCoin Deployment ===");
   console.log("Deployer:", deployer.address);
-  console.log(
-    "Balance:",
-    ethers.formatEther(await ethers.provider.getBalance(deployer.address)),
-    "ETH\n"
-  );
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
 
-  // ── 1. Deploy AIStablecoin ──────────────────────────────────────────────
-  const initialSupply = ethers.parseEther("1000000"); // 1,000,000 AISC
+  // ── 1. AIStablecoin ────────────────────────────────────────────────────
   const AIStablecoin = await ethers.getContractFactory("AIStablecoin");
-  const token = await AIStablecoin.deploy(deployer.address, initialSupply);
+  const token = await AIStablecoin.deploy(deployer.address, ethers.parseEther("1000000"));
   await token.waitForDeployment();
-  console.log("✅ AIStablecoin deployed:", await token.getAddress());
+  console.log("✅ AIStablecoin deployed:   ", await token.getAddress());
 
-  // ── 2. Deploy OracleReceiver ───────────────────────────────────────────
-  // Replace these with your actual oracle node addresses before deploying to testnet
-  const oracleNodes = [
-    deployer.address, // placeholder — replace with real oracle wallet
-    deployer.address, // placeholder
-    deployer.address, // placeholder
-  ];
-  const quorum = 2;
-
+  // ── 2. OracleReceiver ──────────────────────────────────────────────────
+  // Replace placeholder addresses with real oracle node wallets
+  const oracleNodes = [deployer.address, deployer.address, deployer.address];
   const OracleReceiver = await ethers.getContractFactory("OracleReceiver");
-  const oracle = await OracleReceiver.deploy(
-    deployer.address,
-    oracleNodes,
-    quorum
-  );
+  const oracle = await OracleReceiver.deploy(deployer.address, oracleNodes, 2);
   await oracle.waitForDeployment();
-  console.log("✅ OracleReceiver deployed:", await oracle.getAddress());
+  console.log("✅ OracleReceiver deployed: ", await oracle.getAddress());
 
-  // ── 3. Wire up roles ───────────────────────────────────────────────────
-  // In production, PriceController address goes here.
-  // For now just log the role bytes so you can grant them later.
+  // ── 3. PriceController ─────────────────────────────────────────────────
+  // Treasury = deployer for testnet. Use a multisig in production.
+  const PriceController = await ethers.getContractFactory("PriceController");
+  const controller = await PriceController.deploy(
+    deployer.address,
+    await oracle.getAddress(),
+    await token.getAddress(),
+    deployer.address
+  );
+  await controller.waitForDeployment();
+  console.log("✅ PriceController deployed:", await controller.getAddress());
+
+  // ── 4. Wire roles ──────────────────────────────────────────────────────
   const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
   const BURNER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("BURNER_ROLE"));
   const REBASE_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REBASE_ROLE"));
-  console.log("\n── Role bytes (use these when wiring PriceController) ──");
-  console.log("MINTER_ROLE:", MINTER_ROLE);
-  console.log("BURNER_ROLE:", BURNER_ROLE);
-  console.log("REBASE_ROLE:", REBASE_ROLE);
+  const KEEPER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("KEEPER_ROLE"));
 
-  console.log("\n── Summary ──────────────────────────────────────────────");
-  console.log("AIStablecoin :", await token.getAddress());
-  console.log("OracleReceiver:", await oracle.getAddress());
-  console.log("\nNext steps:");
-  console.log(
-    "1. Verify on Basescan: npx hardhat verify --network baseSepolia <address> <args>"
-  );
-  console.log(
-    "2. Grant MINTER_ROLE + BURNER_ROLE + REBASE_ROLE to PriceController (Phase 3)"
-  );
-  console.log(
-    "3. Grant CONSUMER_ROLE on OracleReceiver to PriceController and AIController"
-  );
+  await token.grantRole(MINTER_ROLE, await controller.getAddress());
+  await token.grantRole(BURNER_ROLE, await controller.getAddress());
+  await token.grantRole(REBASE_ROLE, await controller.getAddress());
+  await controller.grantRole(KEEPER_ROLE, deployer.address);
+  console.log("\n✅ All roles wired");
+
+  // ── 5. Summary ─────────────────────────────────────────────────────────
+  console.log("\n── Deployed Addresses ────────────────────────────────────");
+  console.log("AIStablecoin   :", await token.getAddress());
+  console.log("OracleReceiver :", await oracle.getAddress());
+  console.log("PriceController:", await controller.getAddress());
+  console.log("\n── Next Steps ────────────────────────────────────────────");
+  console.log("1. npx hardhat verify --network baseSepolia <address> <args>");
+  console.log("2. Replace oracle node placeholders with real wallet addresses");
+  console.log("3. Replace treasury (deployer) with a multisig in production");
+  console.log("4. Set up a keeper bot to call PriceController.stabilize() hourly");
+  console.log("5. Phase 4: deploy AIController, grant it KEEPER_ROLE on PriceController");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+main().catch((err) => { console.error(err); process.exitCode = 1; });
