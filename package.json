@@ -1,7 +1,7 @@
 {
   "name": "ai-stablecoin",
   "version": "1.0.0",
-  "description": "AI StableCoin smart contracts — Phases 1 & 2",
+  "description": "AI StableCoin smart contractscd ",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",

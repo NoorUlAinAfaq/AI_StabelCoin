@@ -33,10 +33,10 @@ contract AIStablecoin is IERC20 {
     // ── Token metadata ────────────────────────────────────────────────────────
     string public constant name     = unicode"A\u0336rithmic";
     string public constant symbol   = unicode"USDA\u0336";
-    uint8  public constant decimals = 6;
+    uint8  public constant decimals = 18;
 
     // ── Supply caps ───────────────────────────────────────────────────────────
-    uint256 public constant MAX_SUPPLY          = 1_000_000_000 * 1e6;
+    uint256 public constant MAX_SUPPLY          = 1_000_000_000 * 1e18;
     uint256 public constant MAX_REBASE_PERCENT  = 10;
 
     // ── Roles ─────────────────────────────────────────────────────────────────

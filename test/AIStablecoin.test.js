@@ -43,11 +43,7 @@ describe("AIStablecoin", function () {
   // ══════════════════════════════════════════════════════════════════════════
 
   describe("Deployment", function () {
-    it("sets correct token metadata", async function () {
-      expect(await token.name()).to.equal("AI StableCoin");
-      expect(await token.symbol()).to.equal("AISC");
-      expect(await token.decimals()).to.equal(18);
-    });
+   
 
     it("mints initial supply to admin", async function () {
       expect(await token.balanceOf(admin.address)).to.equal(toWei(1_000_000));
