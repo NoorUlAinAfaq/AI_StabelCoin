@@ -21,30 +21,31 @@ module.exports = {
 
     // Base Sepolia testnet
     // Get ETH from: https://www.alchemy.com/faucets/base-sepolia
-    baseSepolia: {
-      url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 84532,
-    },
+    // WITH this:
+amoy: {
+  url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+  accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+  chainId: 80002,
+},
   },
 
   // Etherscan / Basescan — for contract verification
-  etherscan: {
-    apiKey: {
-      baseSepolia: process.env.BASESCAN_API_KEY || "",
-    },
-    customChains: [
-      {
-        network: "baseSepolia",
-        chainId: 84532,
-        urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
-          browserURL: "https://sepolia.basescan.org",
-        },
-      },
-    ],
+  // WITH this:
+etherscan: {
+  apiKey: {
+    amoy: process.env.POLYGONSCAN_API_KEY || "",
   },
-
+  customChains: [
+    {
+      network: "amoy",
+      chainId: 80002,
+      urls: {
+        apiURL: "https://api-amoy.polygonscan.com/api",
+        browserURL: "https://amoy.polygonscan.com",
+      },
+    },
+  ],
+},
   // Gas reporting (printed after each test run)
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
