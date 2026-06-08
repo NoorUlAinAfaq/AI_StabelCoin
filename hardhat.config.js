@@ -19,9 +19,6 @@ module.exports = {
       chainId: 31337,
     },
 
-    // Base Sepolia testnet
-    // Get ETH from: https://www.alchemy.com/faucets/base-sepolia
-    // WITH this:
 amoy: {
   url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
@@ -29,8 +26,7 @@ amoy: {
 },
   },
 
-  // Etherscan / Basescan — for contract verification
-  // WITH this:
+  
 etherscan: {
   apiKey: {
     amoy: process.env.POLYGONSCAN_API_KEY || "",
