@@ -11,12 +11,12 @@ contract MockToken {
     mapping(address => uint256) public balances;
 
     // Call tracking
-    bool    public mintCalled;
-    bool    public burnCalled;
-    bool    public rebaseCalled;
+    bool public mintCalled;
+    bool public burnCalled;
+    bool public rebaseCalled;
     uint256 public lastMintAmount;
     uint256 public lastBurnAmount;
-    int256  public lastRebaseBps;
+    int256 public lastRebaseBps;
     address public lastMintTo;
 
     // Fault injection
@@ -37,13 +37,13 @@ contract MockToken {
     }
 
     function reset() external {
-        mintCalled    = false;
-        burnCalled    = false;
-        rebaseCalled  = false;
+        mintCalled = false;
+        burnCalled = false;
+        rebaseCalled = false;
         lastMintAmount = 0;
         lastBurnAmount = 0;
-        lastRebaseBps  = 0;
-        lastMintTo     = address(0);
+        lastRebaseBps = 0;
+        lastMintTo = address(0);
     }
 
     // ── IStablecoin interface ─────────────────────────────────────────────────
@@ -57,23 +57,23 @@ contract MockToken {
     }
 
     function mint(address to, uint256 amount) external {
-        mintCalled     = true;
+        mintCalled = true;
         lastMintAmount = amount;
-        lastMintTo     = to;
-        supply         += amount;
-        balances[to]   += amount;
+        lastMintTo = to;
+        supply += amount;
+        balances[to] += amount;
     }
 
     function burn(address from, uint256 amount) external {
         require(!shouldRevertBurn, "MockToken: burn reverted");
-        burnCalled      = true;
-        lastBurnAmount  = amount;
-        supply          -= amount;
-        balances[from]  -= amount;
+        burnCalled = true;
+        lastBurnAmount = amount;
+        supply -= amount;
+        balances[from] -= amount;
     }
 
     function rebase(int256 bps) external {
-        rebaseCalled  = true;
+        rebaseCalled = true;
         lastRebaseBps = bps;
         if (bps > 0) {
             supply = (supply * (10_000 + uint256(bps))) / 10_000;

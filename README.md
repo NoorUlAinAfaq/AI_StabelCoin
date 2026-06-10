@@ -233,15 +233,4 @@ npx hardhat verify --network baseSepolia <address> "0xAdmin" "<priceController>"
 | `systemStatus()` | Anyone | Full live snapshot for dashboards |
 | `agentCooldownRemaining(addr)` | Anyone | Seconds until agent can resubmit |
 
----
 
-## Common Commands
-
-```bash
-npm test                                        # all tests
-npx hardhat test test/AIController.test.js      # one file
-npx hardhat coverage                            # coverage report
-npx hardhat compile                             # recompile
-npx hardhat node                                # local chain
-npx hardhat console --network baseSepolia       # interactive console
-```

@@ -37,13 +37,16 @@ pragma solidity ^0.8.24;
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface IOracle {
-    function latestValidatedPrice() external view returns (uint256 price, uint256 timestamp);
-    function deviationFromPeg()     external view returns (int256 bps);
-    function PEG_PRICE()            external view returns (uint256);
+    function latestValidatedPrice()
+        external
+        view
+        returns (uint256 price, uint256 timestamp);
+    function deviationFromPeg() external view returns (int256 bps);
+    function PEG_PRICE() external view returns (uint256);
 }
 
 interface IStablecoin {
-    function totalSupply()           external view returns (uint256);
+    function totalSupply() external view returns (uint256);
     function mint(address to, uint256 amount) external;
     function burn(address from, uint256 amount) external;
     function rebase(int256 adjustmentBps) external;
@@ -55,15 +58,14 @@ interface IStablecoin {
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract PriceController {
-
     // ── Role constants ────────────────────────────────────────────────────────
-    bytes32 public constant ADMIN_ROLE  = keccak256("ADMIN_ROLE");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
     mapping(bytes32 => mapping(address => bool)) private _roles;
 
     // ── Connected contracts ───────────────────────────────────────────────────
-    IOracle     public oracle;
+    IOracle public oracle;
     IStablecoin public token;
 
     // ── Peg ───────────────────────────────────────────────────────────────────
@@ -71,11 +73,11 @@ contract PriceController {
     uint256 public constant PEG = 5_000_000;
 
     // ── Safety limits (configurable) ──────────────────────────────────────────
-    uint256 public maxMintPercent       = 5;    // % of totalSupply per cycle
-    uint256 public maxBurnPercent       = 5;    // % of totalSupply per cycle
-    uint256 public maxRebaseBps         = 500;  // basis points per cycle
+    uint256 public maxMintPercent = 5; // % of totalSupply per cycle
+    uint256 public maxBurnPercent = 5; // % of totalSupply per cycle
+    uint256 public maxRebaseBps = 500; // basis points per cycle
     uint256 public stabilizationCooldown = 1 hours;
-    uint256 public minDeviationBps      = 100;  // 1% — ignore tiny fluctuations
+    uint256 public minDeviationBps = 100; // 1% — ignore tiny fluctuations
 
     // ── Stabilization treasury ────────────────────────────────────────────────
     // Minted tokens go here; burned tokens come from here.
@@ -83,12 +85,17 @@ contract PriceController {
     address public treasury;
 
     // ── State ─────────────────────────────────────────────────────────────────
-    bool    public paused;
+    bool public paused;
     uint256 public lastStabilizationTimestamp;
     uint256 public totalStabilizationCycles;
 
     // ── Action enum ───────────────────────────────────────────────────────────
-    enum Action { NONE, MINT, BURN, REBASE }
+    enum Action {
+        NONE,
+        MINT,
+        BURN,
+        REBASE
+    }
 
     // ── Historical log (last 50 cycles) ──────────────────────────────────────
     uint256 public constant LOG_SIZE = 50;
@@ -96,10 +103,10 @@ contract PriceController {
     struct StabilizationRecord {
         uint256 cycleId;
         uint256 oraclePrice;
-        int256  deviationBps;
-        Action  action;
-        uint256 amount;       // tokens minted/burned (0 for NONE)
-        int256  rebaseBps;    // bps passed to rebase() (0 if not REBASE)
+        int256 deviationBps;
+        Action action;
+        uint256 amount; // tokens minted/burned (0 for NONE)
+        int256 rebaseBps; // bps passed to rebase() (0 if not REBASE)
         uint256 supplyBefore;
         uint256 supplyAfter;
         uint256 timestamp;
@@ -115,10 +122,10 @@ contract PriceController {
     event StabilizationExecuted(
         uint256 indexed cycleId,
         uint256 oraclePrice,
-        int256  deviationBps,
-        Action  action,
+        int256 deviationBps,
+        Action action,
         uint256 mintBurnAmount,
-        int256  rebaseBps,
+        int256 rebaseBps,
         uint256 supplyBefore,
         uint256 supplyAfter,
         uint256 timestamp
@@ -126,8 +133,8 @@ contract PriceController {
 
     event StabilizationSkipped(
         uint256 oraclePrice,
-        int256  deviationBps,
-        string  reason,
+        int256 deviationBps,
+        string reason,
         uint256 timestamp
     );
 
@@ -164,15 +171,15 @@ contract PriceController {
         address _token,
         address _treasury
     ) {
-        require(admin     != address(0), "PriceController: zero admin");
-        require(_oracle   != address(0), "PriceController: zero oracle");
-        require(_token    != address(0), "PriceController: zero token");
+        require(admin != address(0), "PriceController: zero admin");
+        require(_oracle != address(0), "PriceController: zero oracle");
+        require(_token != address(0), "PriceController: zero token");
         require(_treasury != address(0), "PriceController: zero treasury");
 
         _grantRole(ADMIN_ROLE, admin);
 
-        oracle   = IOracle(_oracle);
-        token    = IStablecoin(_token);
+        oracle = IOracle(_oracle);
+        token = IStablecoin(_token);
         treasury = _treasury;
     }
 
@@ -188,13 +195,14 @@ contract PriceController {
     function stabilize() external onlyRole(KEEPER_ROLE) whenNotPaused {
         // ── 1. Cooldown check ─────────────────────────────────────────────────
         require(
-            block.timestamp >= lastStabilizationTimestamp + stabilizationCooldown,
+            block.timestamp >=
+                lastStabilizationTimestamp + stabilizationCooldown,
             "PriceController: cooldown active"
         );
 
         // ── 2. Read oracle ────────────────────────────────────────────────────
         (uint256 currentPrice, ) = oracle.latestValidatedPrice();
-        int256 deviationBps      = oracle.deviationFromPeg();
+        int256 deviationBps = oracle.deviationFromPeg();
 
         // ── 3. Dead-band check — skip tiny deviations ─────────────────────────
         uint256 absDeviation = deviationBps >= 0
@@ -214,9 +222,9 @@ contract PriceController {
 
         // ── 4. Determine action and magnitude ─────────────────────────────────
         uint256 supplyBefore = token.totalSupply();
-        Action  action;
+        Action action;
         uint256 mintBurnAmount;
-        int256  rebaseBps;
+        int256 rebaseBps;
 
         if (currentPrice > PEG) {
             // Price above peg: expand supply to push price down
@@ -242,7 +250,10 @@ contract PriceController {
             uint256 actualBurn = mintBurnAmount > treasuryBalance
                 ? treasuryBalance
                 : mintBurnAmount;
-            require(actualBurn > 0, "PriceController: treasury empty, cannot burn");
+            require(
+                actualBurn > 0,
+                "PriceController: treasury empty, cannot burn"
+            );
             token.burn(treasury, actualBurn);
             mintBurnAmount = actualBurn; // log actual amount
         } else if (action == Action.REBASE) {
@@ -259,15 +270,15 @@ contract PriceController {
 
         // ── 7. Log ────────────────────────────────────────────────────────────
         _log[_logIndex] = StabilizationRecord({
-            cycleId:      cycleId,
-            oraclePrice:  currentPrice,
+            cycleId: cycleId,
+            oraclePrice: currentPrice,
             deviationBps: deviationBps,
-            action:       action,
-            amount:       mintBurnAmount,
-            rebaseBps:    rebaseBps,
+            action: action,
+            amount: mintBurnAmount,
+            rebaseBps: rebaseBps,
             supplyBefore: supplyBefore,
-            supplyAfter:  supplyAfter,
-            timestamp:    block.timestamp
+            supplyAfter: supplyAfter,
+            timestamp: block.timestamp
         });
         _logIndex = (_logIndex + 1) % LOG_SIZE;
 
@@ -291,35 +302,43 @@ contract PriceController {
     /**
      * @notice Live status snapshot — useful for dashboards and AIController.
      */
-    function status() external view returns (
-        uint256 currentPrice,
-        int256  deviationBps,
-        uint256 totalSupply,
-        uint256 lastCycleTimestamp,
-        uint256 cyclesExecuted,
-        bool    isPaused
-    ) {
+    function status()
+        external
+        view
+        returns (
+            uint256 currentPrice,
+            int256 deviationBps,
+            uint256 totalSupply,
+            uint256 lastCycleTimestamp,
+            uint256 cyclesExecuted,
+            bool isPaused
+        )
+    {
         (currentPrice, ) = oracle.latestValidatedPrice();
-        deviationBps     = oracle.deviationFromPeg();
-        totalSupply      = token.totalSupply();
+        deviationBps = oracle.deviationFromPeg();
+        totalSupply = token.totalSupply();
         lastCycleTimestamp = lastStabilizationTimestamp;
-        cyclesExecuted   = totalStabilizationCycles;
-        isPaused         = paused;
+        cyclesExecuted = totalStabilizationCycles;
+        isPaused = paused;
     }
 
     /**
      * @notice Preview what action stabilize() would take right now, without
      *         executing it. Useful for keeper bots and monitoring.
      */
-    function previewStabilization() external view returns (
-        Action  action,
-        uint256 mintBurnAmount,
-        int256  rebaseBps,
-        uint256 currentPrice,
-        int256  deviationBps
-    ) {
+    function previewStabilization()
+        external
+        view
+        returns (
+            Action action,
+            uint256 mintBurnAmount,
+            int256 rebaseBps,
+            uint256 currentPrice,
+            int256 deviationBps
+        )
+    {
         (currentPrice, ) = oracle.latestValidatedPrice();
-        deviationBps     = oracle.deviationFromPeg();
+        deviationBps = oracle.deviationFromPeg();
 
         uint256 absDeviation = deviationBps >= 0
             ? uint256(deviationBps)
@@ -332,26 +351,32 @@ contract PriceController {
         uint256 supply = token.totalSupply();
 
         if (currentPrice > PEG) {
-            (action, mintBurnAmount, rebaseBps) = _calcExpansion(currentPrice, deviationBps, supply);
+            (action, mintBurnAmount, rebaseBps) = _calcExpansion(
+                currentPrice,
+                deviationBps,
+                supply
+            );
         } else {
-            (action, mintBurnAmount, rebaseBps) = _calcContraction(currentPrice, deviationBps, supply);
+            (action, mintBurnAmount, rebaseBps) = _calcContraction(
+                currentPrice,
+                deviationBps,
+                supply
+            );
         }
     }
 
     /**
      * @notice Returns the last `count` stabilization records (newest first).
      */
-    function recentLog(uint256 count)
-        external
-        view
-        returns (StabilizationRecord[] memory records)
-    {
+    function recentLog(
+        uint256 count
+    ) external view returns (StabilizationRecord[] memory records) {
         if (count > LOG_SIZE) count = LOG_SIZE;
         records = new StabilizationRecord[](count);
         for (uint256 i = 0; i < count; i++) {
             // Walk backwards from latest entry
             uint256 idx = (_logIndex + LOG_SIZE - 1 - i) % LOG_SIZE;
-            records[i]  = _log[idx];
+            records[i] = _log[idx];
         }
     }
 
@@ -359,10 +384,15 @@ contract PriceController {
      * @notice Seconds remaining until stabilize() can be called again.
      */
     function cooldownRemaining() external view returns (uint256) {
-        if (block.timestamp >= lastStabilizationTimestamp + stabilizationCooldown) {
+        if (
+            block.timestamp >=
+            lastStabilizationTimestamp + stabilizationCooldown
+        ) {
             return 0;
         }
-        return (lastStabilizationTimestamp + stabilizationCooldown) - block.timestamp;
+        return
+            (lastStabilizationTimestamp + stabilizationCooldown) -
+            block.timestamp;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -376,7 +406,7 @@ contract PriceController {
      */
     function _calcExpansion(
         uint256 /* price */,
-        int256  deviationBps,
+        int256 deviationBps,
         uint256 supply
     )
         internal
@@ -396,7 +426,7 @@ contract PriceController {
         // mintAmount = supply * deviationBps / 10000, capped at maxMintPercent
         uint256 rawMintBps = absBps / 2;
         uint256 maxMintBps = maxMintPercent * 100;
-        uint256 finalBps   = _min(rawMintBps, maxMintBps);
+        uint256 finalBps = _min(rawMintBps, maxMintBps);
         mintAmount = (supply * finalBps) / 10_000;
         return (Action.MINT, mintAmount, 0);
     }
@@ -408,7 +438,7 @@ contract PriceController {
      */
     function _calcContraction(
         uint256 /* price */,
-        int256  deviationBps,
+        int256 deviationBps,
         uint256 supply
     )
         internal
@@ -427,7 +457,7 @@ contract PriceController {
         // Small deviation — targeted burn
         uint256 rawBurnBps = absBps / 2;
         uint256 maxBurnBps = maxBurnPercent * 100;
-        uint256 finalBps   = _min(rawBurnBps, maxBurnBps);
+        uint256 finalBps = _min(rawBurnBps, maxBurnBps);
         burnAmount = (supply * finalBps) / 10_000;
         return (Action.BURN, burnAmount, 0);
     }
@@ -472,8 +502,14 @@ contract PriceController {
         maxRebaseBps = bps;
     }
 
-    function setStabilizationCooldown(uint256 cooldown) external onlyRole(ADMIN_ROLE) {
-        emit ConfigUpdated("stabilizationCooldown", stabilizationCooldown, cooldown);
+    function setStabilizationCooldown(
+        uint256 cooldown
+    ) external onlyRole(ADMIN_ROLE) {
+        emit ConfigUpdated(
+            "stabilizationCooldown",
+            stabilizationCooldown,
+            cooldown
+        );
         stabilizationCooldown = cooldown;
     }
 
@@ -485,11 +521,17 @@ contract PriceController {
 
     // ── Role management ───────────────────────────────────────────────────────
 
-    function grantRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+    function grantRole(
+        bytes32 role,
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         _grantRole(role, account);
     }
 
-    function revokeRole(bytes32 role, address account) external onlyRole(ADMIN_ROLE) {
+    function revokeRole(
+        bytes32 role,
+        address account
+    ) external onlyRole(ADMIN_ROLE) {
         require(
             !(role == ADMIN_ROLE && account == msg.sender),
             "PriceController: cannot revoke own admin"
@@ -498,7 +540,10 @@ contract PriceController {
         emit RoleRevoked(role, account);
     }
 
-    function hasRole(bytes32 role, address account) external view returns (bool) {
+    function hasRole(
+        bytes32 role,
+        address account
+    ) external view returns (bool) {
         return _roles[role][account];
     }
 

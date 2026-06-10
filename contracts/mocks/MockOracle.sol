@@ -7,13 +7,13 @@ pragma solidity ^0.8.24;
  *         Lets tests set any price and deviation freely.
  */
 contract MockOracle {
-    uint256 public price      = 5_000_000;
-    int256  public deviation  = 0;
+    uint256 public price = 5_000_000;
+    int256 public deviation = 0;
     uint256 public constant PEG_PRICE = 5_000_000;
-    bool    public shouldRevert;
+    bool public shouldRevert;
 
     function setPrice(uint256 _price, int256 _deviation) external {
-        price     = _price;
+        price = _price;
         deviation = _deviation;
     }
 

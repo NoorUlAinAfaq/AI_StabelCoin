@@ -1,5 +1,5 @@
 // scripts/deploy.js
-// Run: npx hardhat run scripts/deploy.js --network baseSepolia
+// Run: .exit --network baseSepolia
 
 const { ethers } = require("hardhat");
 
@@ -35,6 +35,17 @@ async function main() {
   await controller.waitForDeployment();
   console.log("✅ PriceController deployed:", await controller.getAddress());
 
+  // ── 4. AIController ─────────────────────────────────────────────────
+  // Treasury = deployer for testnet. Use a multisig in production.
+  const AIController = await ethers.getContractFactory("AIController");
+  const aicontroller = await AIController.deploy(
+    deployer.address,
+    await oracle.getAddress(),
+    await controller.getAddress()
+  );
+  await aicontroller.waitForDeployment();
+  console.log("✅ AIController deployed:", await aicontroller.getAddress());
+
   // ── 4. Wire roles ──────────────────────────────────────────────────────
   const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
   const BURNER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("BURNER_ROLE"));
@@ -46,18 +57,24 @@ async function main() {
   await token.grantRole(REBASE_ROLE, await controller.getAddress());
   await controller.grantRole(KEEPER_ROLE, deployer.address);
   console.log("\n✅ All roles wired");
+  console.log("\n MINTER ROLE:", await MINTER_ROLE)
 
   // ── 5. Summary ─────────────────────────────────────────────────────────
   console.log("\n── Deployed Addresses ────────────────────────────────────");
   console.log("AIStablecoin   :", await token.getAddress());
   console.log("OracleReceiver :", await oracle.getAddress());
   console.log("PriceController:", await controller.getAddress());
-  console.log("\n── Next Steps ────────────────────────────────────────────");
+  console.log("AIController:", await aicontroller.getAddress());
+  console.log("\n MINTER ROLE:", await MINTER_ROLE)
+  console.log("\n BURNER ROLE:", await BURNER_ROLE)
+  console.log("\n REBASE_ ROLE:", await REBASE_ROLE)
+  console.log("\n KEEPER ROLE:", await KEEPER_ROLE)
+  /*console.log("\n── Next Steps ────────────────────────────────────────────");
   console.log("1. npx hardhat verify --network baseSepolia <address> <args>");
   console.log("2. Replace oracle node placeholders with real wallet addresses");
   console.log("3. Replace treasury (deployer) with a multisig in production");
   console.log("4. Set up a keeper bot to call PriceController.stabilize() hourly");
-  console.log("5. Phase 4: deploy AIController, grant it KEEPER_ROLE on PriceController");
+  console.log("5. Phase 4: deploy AIController, grant it KEEPER_ROLE on PriceController");*/
 }
 
 main().catch((err) => { console.error(err); process.exitCode = 1; });
