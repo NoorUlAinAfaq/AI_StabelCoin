@@ -69,8 +69,7 @@ async function main() {
   console.log("\n BURNER ROLE:", await BURNER_ROLE)
   console.log("\n REBASE_ ROLE:", await REBASE_ROLE)
   console.log("\n KEEPER ROLE:", await KEEPER_ROLE)
-  /*console.log("\n── Next Steps ────────────────────────────────────────────");
-  console.log("1. npx hardhat verify --network baseSepolia <address> <args>");
+  /*
   console.log("2. Replace oracle node placeholders with real wallet addresses");
   console.log("3. Replace treasury (deployer) with a multisig in production");
   console.log("4. Set up a keeper bot to call PriceController.stabilize() hourly");
